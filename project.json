@@ -1,0 +1,39 @@
+{
+  "format_version": 1007,
+  "level_id": "PB039",
+  "name": "ANIMAL RACE",
+  "output": "Animal Race.tec.png",
+  "padding": 0,
+  "auxiliary_line_count": 0,
+  "statistics": [],
+  "cover": {
+    "width": 250,
+    "height": 372,
+    "background": "#102a2f",
+    "foreground": "#f5e7bd",
+    "accent": "#ed5b42"
+  },
+  "agents": [
+    {
+      "name": "GM",
+      "source": "agents/00-GM.exa",
+      "sprite": "sprites/00-GM.txt",
+      "view_mode": "minimized",
+      "message_mode": "global"
+    },
+    {
+      "name": "UI",
+      "source": "agents/01-UI.exa",
+      "sprite": "sprites/01-UI.txt",
+      "view_mode": "minimized",
+      "message_mode": "global"
+    },
+    {
+      "name": "AU",
+      "source": "agents/02-AU.exa",
+      "sprite": "sprites/02-AU.txt",
+      "view_mode": "minimized",
+      "message_mode": "global"
+    }
+  ]
+}
