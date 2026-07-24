@@ -28,7 +28,7 @@ caramel puddle, and a diamond plate, plus the `FlanGran.de` wordmark and a
 four-channel boot jingle before game EXAs enter their input, UI, and audio
 hosts. `sprites/splash.txt` is the complete splash source image. During every
 build, `tools/gen_splash.py` slices it into EXA tiles and rewrites
-`agents/03-BT.exa` and `agents/01-UI.exa`.
+the generated sections in all four agent files.
 
 `BANK` appears at the top-left. Each lane's odds appear under `ODDS` on the
 right. During wager selection, the wager digit appears just left of the chosen
@@ -80,6 +80,17 @@ python3 homebrew/animal-race/sprites/splash_editor.py
 
 Its Save and Load buttons use memory only. Export overwrites `splash.txt`.
 
+The boot jingle uses `audio/boot_music.txt`. Each row is one 30Hz step:
+`duration sqr0 sqr1 tri0 nse0`, with channel values from 0 (off) through 99.
+Edit it graphically with:
+
+```sh
+python3 homebrew/animal-race/audio/boot_music_editor.py
+```
+
+The composer has RAM-only Save/Load, step editing/reordering, Export, and a
+local preview matching Redshift's pitch and waveform rules.
+
 The normal build command runs `tools/gen_splash.py` automatically through the
 `prebuild` entry in `project.json`. The generator splits the canvas on the
 screen's 10x10 grid, deduplicates tile patterns, and assigns nonempty tiles to
@@ -90,18 +101,21 @@ limit.
 ## Source layout
 
 - `project.json`: solution metadata, cover palette, agent list, and output path.
-- `agents/00-GM.exa`: game state, input, racers, odds, scoring, results, and
+- `agents/00-GM.exa`: generated splash tile, game state, racers, scoring, and
   local race messaging.
-- `agents/01-UI.exa`: splash cap/plate tiles at boot, then persistent `BANK`
-  and `ODDS` labels.
-- `agents/02-AU.exa`: persistent four-channel audio controller in host `801`.
-- `agents/03-BT.exa`: Flan logo reveal, boot jingle, and startup synchronization.
+- `agents/01-UI.exa`: generated splash workers, then persistent `BANK` and
+  `ODDS` labels.
+- `agents/02-AU.exa`: generated splash tile and persistent audio controller.
+- `agents/03-BT.exa`: generated splash workers, boot jingle, and startup sync.
 - `sprites/00-GM.txt`: selection arrow inherited by game-manager clones.
 - `sprites/01-UI.txt`: blank canvas for built-in font characters.
 - `sprites/02-AU.txt`: blank audio-controller sprite.
 - `sprites/03-BT.txt`: blank canvas used to construct logo tiles.
 - `sprites/splash.txt`: editable 120x100 source image for the complete splash.
-- `tools/gen_splash.py`: compile-time canvas slicer and EXA source generator.
+- `sprites/splash_editor.py`: ImGui splash editor and exact-size preview.
+- `audio/boot_music.txt`: editable four-channel startup score.
+- `audio/boot_music_editor.py`: ImGui score editor and local audio preview.
+- `tools/gen_splash.py`: compile-time canvas/music EXA source generator.
 
 Four EXAs are stored initially. `BT` first reveals and clears the boot logo,
 then wakes the three game EXAs. `GM` moves to the input host and uses local

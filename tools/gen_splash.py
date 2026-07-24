@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slice a 120x100 splash canvas into Redshift EXA sprite workers."""
+"""Generate Redshift EXA splash workers and boot music."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ AU = PROJECT / "agents/02-AU.exa"
 GM = PROJECT / "agents/00-GM.exa"
 GM_SPRITE = PROJECT / "sprites/00-GM.txt"
 CANVAS = PROJECT / "sprites/splash.txt"
+BOOT_MUSIC = PROJECT / "audio/boot_music.txt"
 sys.path.insert(0, str(ROOT / "tools"))
 
 from redshift_compile import OFFICIAL_OUTPUT_LINE_LIMIT, expanded_source_line_count
@@ -26,49 +27,54 @@ INPUT_SLOTS = 19
 SOUND_ART_MAX = 18
 AUX_SLOTS = 2
 
-BOOT_SOUND = """MARK BOOT_SOUND
-COPY 300 GP
-LINK 801
-COPY 48 #TRI0
-@REP 4
-WAIT
-@END
-COPY 60 #SQR0
-COPY 64 #SQR1
-@REP 4
-WAIT
-@END
-COPY 67 #SQR0
-COPY 72 #SQR1
-COPY 55 #TRI0
-@REP 6
-WAIT
-@END
-COPY 72 #SQR0
-COPY 76 #SQR1
-COPY 60 #TRI0
-@REP 8
-WAIT
-@END
-COPY 76 #SQR0
-COPY 79 #SQR1
-COPY 64 #TRI0
-@REP 8
-WAIT
-@END
-COPY 84 #SQR0
-COPY 72 #SQR1
-COPY 67 #TRI0
-COPY 35 #NSE0
-@REP 6
-WAIT
-@END
-COPY 0 #SQR0
-COPY 0 #SQR1
-COPY 0 #TRI0
-COPY 0 #NSE0
-HALT
-"""
+def build_boot_sound() -> str:
+    try:
+        lines = BOOT_MUSIC.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise SystemExit(f"cannot read boot music {BOOT_MUSIC}: {error}") from error
+
+    steps: list[tuple[int, int, int, int, int]] = []
+    for line_number, line in enumerate(lines, 1):
+        content = line.split("#", 1)[0].strip()
+        if not content:
+            continue
+        fields = content.split()
+        if len(fields) != 5:
+            raise SystemExit(
+                f"boot music line {line_number} must contain: "
+                "duration sqr0 sqr1 tri0 nse0"
+            )
+        try:
+            step = tuple(int(field) for field in fields)
+        except ValueError as error:
+            raise SystemExit(f"boot music line {line_number} is not numeric") from error
+        duration, *channels = step
+        if not 1 <= duration <= 64:
+            raise SystemExit(
+                f"boot music line {line_number} duration must be 1..64"
+            )
+        if any(not 0 <= value <= 99 for value in channels):
+            raise SystemExit(
+                f"boot music line {line_number} channels must be 0..99"
+            )
+        steps.append(step)
+    if not steps:
+        raise SystemExit("boot music must contain at least one step")
+
+    registers = ("#SQR0", "#SQR1", "#TRI0", "#NSE0")
+    previous = [0, 0, 0, 0]
+    output = ["MARK BOOT_SOUND", "COPY 300 GP", "LINK 801"]
+    for duration, *channels in steps:
+        for index, value in enumerate(channels):
+            if value != previous[index]:
+                output.append(f"COPY {value} {registers[index]}")
+                previous[index] = value
+        output.extend((f"@REP {duration}", "WAIT", "@END"))
+    for index, value in enumerate(previous):
+        if value:
+            output.append(f"COPY 0 {registers[index]}")
+    output.append("HALT")
+    return "\n".join(output)
 
 TEXT_TAIL = """MARK TEXT_FL
 COPY 33 GX
@@ -337,7 +343,7 @@ def dispatch_and_routines(patterns, routine_fn, skip_zero, clear_first=False) ->
 
 
 def main() -> None:
-    boot_sound = BOOT_SOUND
+    boot_sound = build_boot_sound()
 
     img = build_bitmap()
     tiles = []
