@@ -1,8 +1,9 @@
 ; Persistent audio controller. Global M commands come only from GM.
 ; BEGIN GENERATED SPLASH TILE
+COPY 108 GP
 COPY 109 GP
-COPY 100 GX
-COPY 40 GY
+COPY 90 GX
+COPY 30 GY
 ; END GENERATED SPLASH TILE
 COPY M T
 COPY 300 GP
