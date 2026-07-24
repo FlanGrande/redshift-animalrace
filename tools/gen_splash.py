@@ -26,6 +26,7 @@ CORE_SLOTS = 14
 INPUT_SLOTS = 19
 SOUND_ART_MAX = 18
 AUX_SLOTS = 2
+WINK_TILE = (50, 30)
 
 def build_boot_sound() -> str:
     try:
@@ -64,12 +65,25 @@ def build_boot_sound() -> str:
     registers = ("#SQR0", "#SQR1", "#TRI0", "#NSE0")
     previous = [0, 0, 0, 0]
     output = ["MARK BOOT_SOUND", "COPY 300 GP", "LINK 801"]
-    for duration, *channels in steps:
+    for step_number, (duration, *channels) in enumerate(steps):
         for index, value in enumerate(channels):
             if value != previous[index]:
                 output.append(f"COPY {value} {registers[index]}")
                 previous[index] = value
-        output.extend((f"@REP {duration}", "WAIT", "@END"))
+        if duration <= 6:
+            output.extend((f"@REP {duration}", "WAIT", "@END"))
+        else:
+            label = f"BOOT_WAIT_{step_number}"
+            output.extend(
+                (
+                    f"COPY {duration} X",
+                    f"MARK {label}",
+                    "WAIT",
+                    "SUBI X 1 X",
+                    "TEST X > 0",
+                    f"TJMP {label}",
+                )
+            )
     for index, value in enumerate(previous):
         if value:
             output.append(f"COPY 0 {registers[index]}")
@@ -303,6 +317,28 @@ def bt_routine(pattern: tuple[int, ...]) -> list[str]:
     return ["COPY 300 GP"] + lit if len(lit) + 1 < len(dark) else dark
 
 
+def parent_wiggle_lines(gy: int) -> list[str]:
+    amplitude = max(1, (80 - gy) // 10)
+    return [
+        "@REP 8",
+        "WAIT",
+        "@END",
+        f"SUBI GX {amplitude} GX",
+        "@REP 6",
+        "WAIT",
+        "@END",
+        f"ADDI GX {amplitude} GX",
+        "@REP 3",
+        "WAIT",
+        "@END",
+        f"ADDI GX {amplitude} GX",
+        "@REP 6",
+        "WAIT",
+        "@END",
+        f"SUBI GX {amplitude} GX",
+    ]
+
+
 def spawn_lines(section, patterns, state) -> list[str]:
     lines = []
     for gx, gy, pattern in section:
@@ -315,6 +351,8 @@ def spawn_lines(section, patterns, state) -> list[str]:
             lines.append(f"COPY {gy} GY")
             state["gy"] = gy
         lines.append("REPL LOGO_TILE")
+        if gy >= 80:
+            lines.extend(("@REP 5", "WAIT", "@END"))
     return lines
 
 
@@ -324,7 +362,7 @@ def dispatch_and_routines(patterns, routine_fn, skip_zero, clear_first=False) ->
         out.append("COPY 300 GP")
     if skip_zero:
         out.append("TEST CO = 0")
-        out.append("TJMP LOGO_HOLD")
+        out.append("TJMP LOGO_ENTER")
     start = 1 if skip_zero else 0
     for index in range(start, len(patterns) - 1):
         out.append(f"TEST CO = {index}")
@@ -334,8 +372,29 @@ def dispatch_and_routines(patterns, routine_fn, skip_zero, clear_first=False) ->
     for index in range(start, len(patterns)):
         out.append(f"MARK TILE_{index}")
         out += routine_fn(patterns[index])
-        out.append("JUMP LOGO_HOLD")
+        out.append("JUMP LOGO_ENTER")
         out.append("")
+    out.append("MARK LOGO_ENTER")
+    out.append("TEST GY > 79")
+    out.append("TJMP LOGO_HOLD")
+    out.append("SUBI 80 GY X")
+    out.append("DIVI X 10 X")
+    out.append("@REP 8")
+    out.append("WAIT")
+    out.append("@END")
+    out.append("SUBI GX X GX")
+    out.append("@REP 6")
+    out.append("WAIT")
+    out.append("@END")
+    out.append("ADDI GX X GX")
+    out.append("@REP 3")
+    out.append("WAIT")
+    out.append("@END")
+    out.append("ADDI GX X GX")
+    out.append("@REP 6")
+    out.append("WAIT")
+    out.append("@END")
+    out.append("SUBI GX X GX")
     out.append("MARK LOGO_HOLD")
     out.append("COPY M T")
     out.append("HALT")
@@ -357,13 +416,33 @@ def main() -> None:
     ui_tiles = [t for t in tiles if len(sets(t[2])) <= 45]
     bt_tiles = [t for t in tiles if t not in ui_tiles]
 
-    # UI itself carries the cheapest tile while waiting for the global boot wake.
-    ui_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
+    # UI carries the final wordmark tile so all text is revealed by one EXA.
+    letter_tiles = [tile for tile in ui_tiles if tile[1] >= 80]
+    if not letter_tiles:
+        raise SystemExit("splash contains no wordmark tiles")
+    if any(tile[1] >= 80 for tile in bt_tiles):
+        raise SystemExit("wordmark tiles must fit the blank-sprite worker budget")
+    ui_parent = max(letter_tiles, key=lambda tile: tile[0])
     ui_tiles.remove(ui_parent)
-    au_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
-    ui_tiles.remove(au_parent)
-    gm_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
+    gm_parent = min(
+        (tile for tile in ui_tiles if tile[1] < 80),
+        key=lambda tile: len(sets(tile[2])),
+    )
     ui_tiles.remove(gm_parent)
+
+    try:
+        au_parent = next(tile for tile in bt_tiles if tile[:2] == WINK_TILE)
+    except StopIteration as error:
+        raise SystemExit(f"wink tile {WINK_TILE} is not a dense splash tile") from error
+    bt_tiles.remove(au_parent)
+    wink_pixels = [
+        (x, y)
+        for y in range(7, 10)
+        for x in range(5)
+        if not au_parent[2][y * 10 + x]
+    ]
+    if not wink_pixels:
+        raise SystemExit(f"wink tile {WINK_TILE} contains no eye pixels")
 
     bt_core = bt_tiles[:CORE_SLOTS]
     bt_input: list = []
@@ -408,21 +487,16 @@ def main() -> None:
     out.append(f"; Isometric flan body and plate: {len(bt_core)} core workers.")
     state = {"co": None, "gy": None}
     out += spawn_lines(bt_core, bt_patterns, state)
-    out.append("@REP 6")
-    out.append("WAIT")
-    out.append("@END")
     out.append("")
     out.append(f"; Remaining rows: {len(bt_sound)} sound workers.")
     out.append("LINK 801")
     out += spawn_lines(bt_sound, bt_patterns, state)
-    out.append("@REP 8")
-    out.append("WAIT")
-    out.append("@END")
     out.append("; BT parent carries one tile without consuming another host slot.")
     out.append("COPY 300 GP")
     out += sets(bt_parent[2])
     out.append(f"COPY {bt_parent[0]} GX")
     out.append(f"COPY {bt_parent[1]} GY")
+    out += parent_wiggle_lines(bt_parent[1])
     out.append("")
     out.append("COPY 65 X")
     out.append("MARK BOOT_HOLD")
@@ -528,8 +602,21 @@ def main() -> None:
     start_index = au_source.index(au_start) + len(au_start)
     end_index = au_source.index(au_end)
     au_tile = "\n".join(
-        sets(au_parent[2])
-        + [f"COPY {au_parent[0]} GX", f"COPY {au_parent[1]} GY"]
+        ["COPY -10 GX", "COPY -10 GY"]
+        + clears(au_parent[2])
+        + [
+            f"COPY {au_parent[0]} GX",
+            f"COPY {au_parent[1]} GY",
+        ]
+        + parent_wiggle_lines(au_parent[1])
+        + [
+            "@REP 14",
+            "WAIT",
+            "@END",
+        ]
+        + [f"COPY {100 + 10 * x + y} GP" for x, y in wink_pixels]
+        + ["@REP 4", "WAIT", "@END"]
+        + [f"COPY {10 * x + y:03d} GP" for x, y in wink_pixels]
     )
     au_source = au_source[:start_index] + au_tile + "\n" + au_source[end_index:]
 
@@ -542,6 +629,7 @@ def main() -> None:
         ["COPY 300 GP"]
         + sets(gm_parent[2])
         + [f"COPY {gm_parent[0]} GX", f"COPY {gm_parent[1]} GY"]
+        + parent_wiggle_lines(gm_parent[1])
     )
     gm_source = gm_source[:start_index] + gm_tile + "\n" + gm_source[end_index:]
 

@@ -23,12 +23,12 @@ Selection and wager changes chirp through the square-wave channels. The
 countdown, running animals, wins, and losses use distinct square, triangle, and
 noise effects.
 
-Startup shows an isometric Flan pudding mascot with a caramel cap, a face, a
-caramel puddle, and a diamond plate, plus the `FlanGran.de` wordmark and a
-four-channel boot jingle before game EXAs enter their input, UI, and audio
-hosts. `sprites/splash.txt` is the complete splash source image. During every
-build, `tools/gen_splash.py` slices it into EXA tiles and rewrites
-the generated sections in all four agent files.
+Startup assembles an isometric Flan pudding mascot in place, swings its upper
+tiles wider than its lower tiles, reveals the `FlanGran.de` wordmark one piece
+at a time, and gives the mascot a wink. A four-channel boot jingle plays before
+game EXAs enter their input, UI, and audio hosts. `sprites/splash.txt` is the
+complete splash source image. During every build, `tools/gen_splash.py` slices
+it into EXA tiles and rewrites the generated sections in all four agent files.
 
 `BANK` appears at the top-left. Each lane's odds appear under `ODDS` on the
 right. During wager selection, the wager digit appears just left of the chosen
@@ -109,7 +109,7 @@ limit.
 - `agents/03-BT.exa`: generated splash workers, boot jingle, and startup sync.
 - `sprites/00-GM.txt`: selection arrow inherited by game-manager clones.
 - `sprites/01-UI.txt`: blank canvas for built-in font characters.
-- `sprites/02-AU.txt`: blank audio-controller sprite.
+- `sprites/02-AU.txt`: full tile template used by the animated eye.
 - `sprites/03-BT.txt`: blank canvas used to construct logo tiles.
 - `sprites/splash.txt`: editable 120x100 source image for the complete splash.
 - `sprites/splash_editor.py`: ImGui splash editor and exact-size preview.
