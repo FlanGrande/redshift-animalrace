@@ -72,6 +72,14 @@ characters. `#` is a lit pixel, `.` is an unlit pixel, and the top-left
 character is display coordinate `(0, 0)`. The file represents the entire
 Redshift display, including the `FlanGran.de` wordmark.
 
+For a minimal graphical editor, install the repository requirements and run:
+
+```sh
+python3 homebrew/animal-race/sprites/splash_editor.py
+```
+
+Its Save and Load buttons use memory only. Export overwrites `splash.txt`.
+
 The normal build command runs `tools/gen_splash.py` automatically through the
 `prebuild` entry in `project.json`. The generator splits the canvas on the
 screen's 10x10 grid, deduplicates tile patterns, and assigns nonempty tiles to
