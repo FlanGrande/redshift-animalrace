@@ -3,6 +3,7 @@
   "level_id": "PB039",
   "name": "ANIMAL RACE",
   "output": "Animal Race.tec.png",
+  "prebuild": "tools/gen_splash.py",
   "padding": 0,
   "auxiliary_line_count": 0,
   "statistics": [],

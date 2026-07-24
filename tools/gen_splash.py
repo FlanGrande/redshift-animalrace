@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the isometric Flan splash across agents 03-BT.exa and 01-UI.exa."""
+"""Slice a 120x100 splash canvas into Redshift EXA sprite workers."""
 
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
@@ -11,16 +10,21 @@ PROJECT = Path(__file__).resolve().parents[1]
 ROOT = PROJECT.parents[1]
 BT = PROJECT / "agents/03-BT.exa"
 UI = PROJECT / "agents/01-UI.exa"
+AU = PROJECT / "agents/02-AU.exa"
+GM = PROJECT / "agents/00-GM.exa"
+GM_SPRITE = PROJECT / "sprites/00-GM.txt"
+CANVAS = PROJECT / "sprites/splash.txt"
 sys.path.insert(0, str(ROOT / "tools"))
 
 from redshift_compile import OFFICIAL_OUTPUT_LINE_LIMIT, expanded_source_line_count
 
 W, H = 120, 100
-ROWS = [3, 13, 23, 33, 43, 53, 63]
-COLS = [20, 30, 40, 50, 60, 70, 80, 90]
+ROWS = range(0, H, 10)
+COLS = range(0, W, 10)
 CORE_SLOTS = 14
 INPUT_SLOTS = 19
-SOUND_ART_MAX = 10
+SOUND_ART_MAX = 18
+AUX_SLOTS = 2
 
 BOOT_SOUND = """MARK BOOT_SOUND
 COPY 300 GP
@@ -189,6 +193,7 @@ COPY 137 GP
 
 UI_HEAD = "; Persistent BANK and ODDS headings after the splash plate."
 UI_TAIL = """COPY M T
+COPY 300 GP
 REPL BANK_B
 REPL BANK_A
 REPL BANK_N
@@ -253,77 +258,22 @@ JUMP HOLD
 
 
 def build_bitmap() -> list[list[int]]:
-    img = [[0] * W for _ in range(H)]
-
-    def ell(x: float, y: float, cx: float, cy: float, rx: float, ry: float) -> float:
-        return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-
-    # Plate: isometric diamond, 2:1 slope, checkered rim band.
-    for y in range(H):
-        for x in range(W):
-            d = 19.0 - (abs(x - 60) / 2 + abs(y - 51))
-            if d >= 0:
-                if d < 1.5:
-                    img[y][x] = 1 if (x + y) % 2 == 0 else 0
-                else:
-                    img[y][x] = 1
-
-    # Caramel puddle ring hugging the flan base.
-    for y in range(H):
-        for x in range(W):
-            v = ell(x, y, 60, 50, 23, 6)
-            if v <= 1.0:
-                if v > 0.74:
-                    img[y][x] = 1 if (x % 4 == 0 and y % 2 == 1) else 0
-                else:
-                    img[y][x] = 0
-
-    # Custard body: gentle taper, rounded bottom bulge, right shading.
-    for y in range(13, 56):
-        t = (y - 13) / 39
-        xl = 42 - 2 * t
-        xr = 78 + 2 * t
-        for x in range(int(math.ceil(xl)), int(math.floor(xr)) + 1):
-            if y <= 47:
-                inside = True
-            else:
-                u = (x - 60) / 20
-                inside = abs(u) <= 1 and y <= 47 + 5 * math.sqrt(max(0.0, 1 - u * u))
-            if not inside:
-                continue
-            if x >= xr - 5:
-                img[y][x] = 1 if (x + y) % 2 == 0 else 0
-            else:
-                img[y][x] = 1
-
-    # Caramel cap: dark 25% fill, bright rim, top-left glint.
-    for y in range(H):
-        for x in range(W):
-            v = ell(x, y, 60, 15, 24, 11)
-            if v <= 1.0:
-                if v > 0.80:
-                    img[y][x] = 1
-                else:
-                    img[y][x] = 1 if (x % 2 == 0 and y % 2 == 0) else 0
-    for y in range(H):
-        for x in range(W):
-            if ell(x, y, 48, 9, 5, 2.2) <= 1.0:
-                img[y][x] = 1
-
-    # Standalone side struts from the cap rim to the plate shoulders.
-    for y in range(18, 51):
-        t = (y - 18) / 32
-        img[y][round(36 - 6 * t)] = 1
-        img[y][round(84 + 6 * t)] = 1
-
-    # Face: round eyes plus open smiling mouth.
-    for y in range(H):
-        for x in range(W):
-            if ell(x, y, 52, 33, 2.1, 3.0) <= 1.0 or ell(x, y, 67, 33, 2.1, 3.0) <= 1.0:
-                img[y][x] = 0
-            if ell(x, y, 59.5, 42, 5.6, 4.6) <= 1.0:
-                img[y][x] = 0
-    return img
+    try:
+        rows = CANVAS.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise SystemExit(f"cannot read splash canvas {CANVAS}: {error}") from error
+    if len(rows) != H or any(len(row) != W for row in rows):
+        widths = sorted({len(row) for row in rows})
+        raise SystemExit(
+            f"splash canvas must be exactly {W}x{H}; "
+            f"got {len(rows)} rows with widths {widths}"
+        )
+    invalid = sorted({character for row in rows for character in row} - {".", "#"})
+    if invalid:
+        raise SystemExit(
+            "splash canvas contains invalid characters: " + ", ".join(invalid)
+        )
+    return [[int(character == "#") for character in row] for row in rows]
 
 
 def tile_pattern(img: list[list[int]], gx: int, gy: int) -> tuple[int, ...]:
@@ -362,8 +312,10 @@ def spawn_lines(section, patterns, state) -> list[str]:
     return lines
 
 
-def dispatch_and_routines(patterns, routine_fn, skip_zero) -> list[str]:
+def dispatch_and_routines(patterns, routine_fn, skip_zero, clear_first=False) -> list[str]:
     out = ["MARK LOGO_TILE", "COPY 0 GZ"]
+    if clear_first:
+        out.append("COPY 300 GP")
     if skip_zero:
         out.append("TEST CO = 0")
         out.append("TJMP LOGO_HOLD")
@@ -386,27 +338,42 @@ def dispatch_and_routines(patterns, routine_fn, skip_zero) -> list[str]:
 
 def main() -> None:
     boot_sound = BOOT_SOUND
-    text_tail = TEXT_TAIL
 
     img = build_bitmap()
     tiles = []
     for gy in ROWS:
         for gx in COLS:
             pattern = tile_pattern(img, gx, gy)
-            if sum(pattern) > 4:
+            if any(pattern):
                 tiles.append((gx, gy, pattern))
 
     # Cheap-from-blank tiles go to UI (blank sprite); the rest stay with BT (full sprite).
-    ui_tiles = [t for t in tiles if len(sets(t[2])) <= 55]
+    ui_tiles = [t for t in tiles if len(sets(t[2])) <= 53]
     bt_tiles = [t for t in tiles if t not in ui_tiles]
+
+    # UI itself carries the cheapest tile while waiting for the global boot wake.
+    ui_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
+    ui_tiles.remove(ui_parent)
+    au_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
+    ui_tiles.remove(au_parent)
+    gm_parent = min(ui_tiles, key=lambda tile: len(sets(tile[2])))
+    ui_tiles.remove(gm_parent)
 
     bt_core = bt_tiles[:CORE_SLOTS]
     bt_input: list = []
     bt_sound = bt_tiles[CORE_SLOTS:]
+    bt_parent = min(bt_sound, key=lambda tile: len(sets(tile[2])))
+    bt_sound.remove(bt_parent)
     ui_input = ui_tiles[:INPUT_SLOTS]
-    ui_sound = ui_tiles[INPUT_SLOTS:]
-    if len(bt_sound) + len(ui_sound) > SOUND_ART_MAX:
-        raise SystemExit("sound host overflow")
+    ui_remaining = ui_tiles[INPUT_SLOTS:]
+    sound_free = SOUND_ART_MAX - len(bt_sound)
+    if sound_free < 0:
+        raise SystemExit("too many dense tiles for the sound host")
+    ui_sound = ui_remaining[:sound_free]
+    ui_aux1 = ui_remaining[sound_free : sound_free + AUX_SLOTS]
+    ui_aux2 = ui_remaining[sound_free + AUX_SLOTS : sound_free + AUX_SLOTS * 2]
+    if len(ui_remaining) > sound_free + AUX_SLOTS * 2:
+        raise SystemExit("splash needs more EXAs than Redshift hosts can hold")
 
     full = tuple([1] * 100)
     bt_patterns = [full]
@@ -420,7 +387,9 @@ def main() -> None:
 
     clear_core = len(bt_core)
     clear_input = len(ui_input)
-    clear_sound = len(bt_sound) + len(ui_sound) + 6
+    clear_sound = len(bt_sound) + len(ui_sound)
+    clear_aux1 = len(ui_aux1)
+    clear_aux2 = len(ui_aux2)
 
     # ---- BT ----
     out = []
@@ -443,22 +412,11 @@ def main() -> None:
     out.append("@REP 8")
     out.append("WAIT")
     out.append("@END")
+    out.append("; BT parent carries one tile without consuming another host slot.")
     out.append("COPY 300 GP")
-    for chunk in (
-        "REPL TEXT_FL",
-        "COPY 43 T",
-        "REPL TEXT_AN",
-        "REPL TEXT_GR",
-        "COPY 63 T",
-        "REPL TEXT_AN2",
-        "REPL TEXT_DOT_D",
-        "REPL TEXT_E",
-    ):
-        out.append(chunk)
-        if chunk.startswith("REPL") and chunk != "REPL TEXT_E":
-            out.append("@REP 3")
-            out.append("WAIT")
-            out.append("@END")
+    out += sets(bt_parent[2])
+    out.append(f"COPY {bt_parent[0]} GX")
+    out.append(f"COPY {bt_parent[1]} GY")
     out.append("")
     out.append("COPY 65 X")
     out.append("MARK BOOT_HOLD")
@@ -466,6 +424,7 @@ def main() -> None:
     out.append("SUBI X 1 X")
     out.append("TEST X > 0")
     out.append("TJMP BOOT_HOLD")
+    out.append("COPY 300 GP")
     out.append("")
     out.append("; Clear local workers in each host before waking game EXAs.")
     out.append(f"COPY {clear_sound} X")
@@ -475,6 +434,24 @@ def main() -> None:
     out.append("TEST X > 0")
     out.append("TJMP CLEAR_SOUND")
     out.append("LINK -1")
+    if clear_aux1:
+        out.append("LINK 802")
+        out.append(f"COPY {clear_aux1} X")
+        out.append("MARK CLEAR_AUX1")
+        out.append("COPY 1 M")
+        out.append("SUBI X 1 X")
+        out.append("TEST X > 0")
+        out.append("TJMP CLEAR_AUX1")
+        out.append("LINK -1")
+    if clear_aux2:
+        out.append("LINK 803")
+        out.append(f"COPY {clear_aux2} X")
+        out.append("MARK CLEAR_AUX2")
+        out.append("COPY 1 M")
+        out.append("SUBI X 1 X")
+        out.append("TEST X > 0")
+        out.append("TJMP CLEAR_AUX2")
+        out.append("LINK -1")
     out.append("LINK 800")
     out.append(f"COPY {clear_input} X")
     out.append("MARK CLEAR_INPUT")
@@ -501,13 +478,9 @@ def main() -> None:
     out.append("")
     out += dispatch_and_routines(bt_patterns, bt_routine, skip_zero=True)
     out.append("")
-    out.append(text_tail)
-    out.append("JUMP LOGO_HOLD")
-    out.append("")
-    bt_text = "\n".join(out)
-
-    # TEXT_AN is replicated twice with different T; keep single label.
-    bt_text = bt_text.replace("REPL TEXT_AN2", "REPL TEXT_AN")
+    bt_text = "\n".join(
+        line for line in out if line and not line.startswith(";")
+    )
 
     # ---- UI ----
     ui = []
@@ -522,12 +495,60 @@ def main() -> None:
         ui.append("LINK 801")
         ui += spawn_lines(ui_sound, ui_patterns, state)
         ui.append("LINK -1")
+    if ui_aux1:
+        ui.append("LINK 802")
+        ui += spawn_lines(ui_aux1, ui_patterns, state)
+        ui.append("LINK -1")
+    if ui_aux2:
+        ui.append("LINK 803")
+        ui += spawn_lines(ui_aux2, ui_patterns, state)
+        ui.append("LINK -1")
     ui.append("MODE")
+    ui.append("; Draw the parent's own splash tile LAST so spawning cannot drag it.")
+    ui += sets(ui_parent[2])
+    ui.append(f"COPY {ui_parent[0]} GX")
+    ui.append(f"COPY {ui_parent[1]} GY")
     ui.append(UI_TAIL.rstrip())
     ui.append("")
-    ui += dispatch_and_routines(ui_patterns, sets, skip_zero=False)
+    ui += dispatch_and_routines(ui_patterns, sets, skip_zero=False, clear_first=True)
     ui.append("")
-    ui_text = "\n".join(ui)
+    ui_text = "\n".join(
+        line for line in ui if line and not line.startswith(";")
+    )
+
+    au_source = AU.read_text(encoding="utf-8")
+    au_start = "; BEGIN GENERATED SPLASH TILE\n"
+    au_end = "; END GENERATED SPLASH TILE"
+    start_index = au_source.index(au_start) + len(au_start)
+    end_index = au_source.index(au_end)
+    au_tile = "\n".join(
+        sets(au_parent[2])
+        + [f"COPY {au_parent[0]} GX", f"COPY {au_parent[1]} GY"]
+    )
+    au_source = au_source[:start_index] + au_tile + "\n" + au_source[end_index:]
+
+    gm_source = GM.read_text(encoding="utf-8")
+    gm_start = "; BEGIN GENERATED SPLASH TILE\n"
+    gm_end = "; END GENERATED SPLASH TILE"
+    start_index = gm_source.index(gm_start) + len(gm_start)
+    end_index = gm_source.index(gm_end)
+    gm_tile = "\n".join(
+        ["COPY 300 GP"]
+        + sets(gm_parent[2])
+        + [f"COPY {gm_parent[0]} GX", f"COPY {gm_parent[1]} GY"]
+    )
+    gm_source = gm_source[:start_index] + gm_tile + "\n" + gm_source[end_index:]
+
+    sprite_rows = GM_SPRITE.read_text(encoding="ascii").splitlines()
+    gm_runtime_pattern = tuple(
+        character == "#" for row in sprite_rows for character in row
+    )
+    restore_start = "; BEGIN GENERATED RUNTIME SPRITE\n"
+    restore_end = "; END GENERATED RUNTIME SPRITE"
+    start_index = gm_source.index(restore_start) + len(restore_start)
+    end_index = gm_source.index(restore_end)
+    gm_restore = "\n".join(["COPY 300 GP"] + sets(gm_runtime_pattern))
+    gm_source = gm_source[:start_index] + gm_restore + "\n" + gm_source[end_index:]
 
     for name, text in (("BT", bt_text), ("UI", ui_text)):
         expanded = expanded_source_line_count(text)
@@ -535,13 +556,17 @@ def main() -> None:
         if expanded > OFFICIAL_OUTPUT_LINE_LIMIT:
             raise SystemExit(f"{name} expanded {expanded} exceeds limit")
     print(
-        f"tiles={len(tiles)} bt_core={len(bt_core)} bt_sound={len(bt_sound)} "
+        f"tiles={len(tiles)} bt_parent=1 bt_core={len(bt_core)} bt_sound={len(bt_sound)} "
+        f"ui_parent=1 au_parent=1 gm_parent=1 "
         f"ui_input={len(ui_input)} ui_sound={len(ui_sound)} "
+        f"ui_aux=({len(ui_aux1)},{len(ui_aux2)}) "
         f"bt_patterns={len(bt_patterns)} ui_patterns={len(ui_patterns)} "
-        f"clears=({clear_core},{clear_input},{clear_sound})"
+        f"clears=({clear_core},{clear_input},{clear_sound},{clear_aux1},{clear_aux2})"
     )
     BT.write_text(bt_text + "\n" if not bt_text.endswith("\n") else bt_text, encoding="utf-8")
     UI.write_text(ui_text + "\n" if not ui_text.endswith("\n") else ui_text, encoding="utf-8")
+    AU.write_text(au_source, encoding="utf-8")
+    GM.write_text(gm_source, encoding="utf-8")
 
 
 if __name__ == "__main__":
