@@ -348,7 +348,7 @@ def main() -> None:
                 tiles.append((gx, gy, pattern))
 
     # Cheap-from-blank tiles go to UI (blank sprite); the rest stay with BT (full sprite).
-    ui_tiles = [t for t in tiles if len(sets(t[2])) <= 53]
+    ui_tiles = [t for t in tiles if len(sets(t[2])) <= 49]
     bt_tiles = [t for t in tiles if t not in ui_tiles]
 
     # UI itself carries the cheapest tile while waiting for the global boot wake.

@@ -11,6 +11,7 @@ from pathlib import Path
 
 WIDTH = 120
 HEIGHT = 100
+PREVIEW_GAP = 20
 SPLASH_PATH = Path(__file__).with_name("splash.txt")
 
 
@@ -94,15 +95,19 @@ def main() -> None:
                 imgui.text(self.status)
 
             available = imgui.get_content_region_avail()
+            editor_width = max(1.0, available.x - WIDTH - PREVIEW_GAP)
             cell_size = max(
                 1.0,
-                math.floor(min(available.x / WIDTH, available.y / HEIGHT)),
+                math.floor(min(editor_width / WIDTH, available.y / HEIGHT)),
             )
             grid_width = WIDTH * cell_size
             grid_height = HEIGHT * cell_size
+            combined_width = grid_width + PREVIEW_GAP + WIDTH
             cursor = imgui.get_cursor_screen_pos()
-            cursor_x = cursor.x + max(0.0, (available.x - grid_width) / 2)
+            cursor_x = cursor.x + max(0.0, (available.x - combined_width) / 2)
             cursor_y = cursor.y
+            preview_x = cursor_x + grid_width + PREVIEW_GAP
+            preview_y = cursor_y
             imgui.set_cursor_screen_pos(imgui.ImVec2(cursor_x, cursor_y))
 
             imgui.invisible_button(
@@ -150,10 +155,32 @@ def main() -> None:
                         grid_color,
                     )
 
+            # Exact 1:1 display preview: one screen pixel per canvas pixel.
+            draw_list.add_rect_filled(
+                imgui.ImVec2(preview_x, preview_y),
+                imgui.ImVec2(preview_x + WIDTH, preview_y + HEIGHT),
+                black,
+            )
+            for row in range(HEIGHT):
+                for column in range(WIDTH):
+                    if self.pixels[row][column]:
+                        x = preview_x + column
+                        y = preview_y + row
+                        draw_list.add_rect_filled(
+                            imgui.ImVec2(x, y),
+                            imgui.ImVec2(x + 1, y + 1),
+                            white,
+                        )
+            draw_list.add_rect(
+                imgui.ImVec2(preview_x - 1, preview_y - 1),
+                imgui.ImVec2(preview_x + WIDTH + 1, preview_y + HEIGHT + 1),
+                grid_color,
+            )
+
     editor = SplashEditor()
     runner_params = hello_imgui.RunnerParams()
     runner_params.app_window_params.window_title = "Redshift Splash Editor"
-    runner_params.app_window_params.window_geometry.size = (980, 860)
+    runner_params.app_window_params.window_geometry.size = (1120, 860)
     runner_params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.provide_full_screen_window
     )
