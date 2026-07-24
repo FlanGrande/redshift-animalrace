@@ -1,4 +1,8 @@
 ; Persistent audio controller. Global M commands come only from GM.
+COPY M T
+@REP 3
+WAIT
+@END
 LINK 801
 COPY 0 #SQR0
 COPY 0 #SQR1

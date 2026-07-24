@@ -3,6 +3,10 @@
 ; Held file: odds for racers 1 through 5.
 DATA 0 0 0 0 0
 
+; Boot controller wakes all three game EXAs after the Flan splash.
+COPY -10 GX
+COPY -10 GY
+COPY M T
 COPY 10 X
 COPY 1 CO
 COPY 1 GZ

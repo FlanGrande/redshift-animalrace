@@ -23,6 +23,10 @@ Selection and wager changes chirp through the square-wave channels. The
 countdown, running animals, wins, and losses use distinct square, triangle, and
 noise effects.
 
+Startup shows a near-full-screen isometric Flan pudding mascot, the
+`FlanGran.de` wordmark, and a four-channel boot jingle before game EXAs enter
+their input, UI, and audio hosts.
+
 `BANK` appears at the top-left. Each lane's odds appear under `ODDS` on the
 right. During wager selection, the wager digit appears just left of the chosen
 lane's odds.
@@ -65,11 +69,14 @@ round-trip to the exact project sources and sprites.
   local race messaging.
 - `agents/01-UI.exa`: persistent `BANK` and `ODDS` labels.
 - `agents/02-AU.exa`: persistent four-channel audio controller in host `801`.
+- `agents/03-BT.exa`: Flan logo reveal, boot jingle, and startup synchronization.
 - `sprites/00-GM.txt`: selection arrow inherited by game-manager clones.
 - `sprites/01-UI.txt`: blank canvas for built-in font characters.
 - `sprites/02-AU.txt`: blank audio-controller sprite.
+- `sprites/03-BT.txt`: blank canvas used to construct logo tiles.
 
-Three EXAs are stored initially. `GM` moves to the input host and uses local
+Four EXAs are stored initially. `BT` first reveals and clears the boot logo,
+then wakes the three game EXAs. `GM` moves to the input host and uses local
 messaging with a single-reader protocol: racers only send odds and finish
 messages, while `GM` alone receives them. `UI` creates the fixed headings. `AU`
 moves to the sound host through `LINK 801` and receives isolated global audio

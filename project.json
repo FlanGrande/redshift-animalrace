@@ -34,6 +34,13 @@
       "sprite": "sprites/02-AU.txt",
       "view_mode": "minimized",
       "message_mode": "global"
+    },
+    {
+      "name": "BT",
+      "source": "agents/03-BT.exa",
+      "sprite": "sprites/03-BT.txt",
+      "view_mode": "minimized",
+      "message_mode": "global"
     }
   ]
 }

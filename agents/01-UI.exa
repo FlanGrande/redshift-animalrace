@@ -1,4 +1,5 @@
 ; Persistent BANK and ODDS headings.
+COPY M T
 REPL BANK_B
 REPL BANK_A
 REPL BANK_N
