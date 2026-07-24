@@ -310,6 +310,12 @@ def build_bitmap() -> list[list[int]]:
             if ell(x, y, 48, 9, 5, 2.2) <= 1.0:
                 img[y][x] = 1
 
+    # Standalone side struts from the cap rim to the plate shoulders.
+    for y in range(18, 51):
+        t = (y - 18) / 32
+        img[y][round(36 - 6 * t)] = 1
+        img[y][round(84 + 6 * t)] = 1
+
     # Face: round eyes plus open smiling mouth.
     for y in range(H):
         for x in range(W):
@@ -387,7 +393,7 @@ def main() -> None:
     for gy in ROWS:
         for gx in COLS:
             pattern = tile_pattern(img, gx, gy)
-            if any(pattern):
+            if sum(pattern) > 4:
                 tiles.append((gx, gy, pattern))
 
     # Cheap-from-blank tiles go to UI (blank sprite); the rest stay with BT (full sprite).
