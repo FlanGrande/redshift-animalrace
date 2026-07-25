@@ -518,7 +518,9 @@ def main() -> None:
     out.append("WAIT")
     out.append("@END")
     out += [f"COPY {100 + 10 * x + y} GP" for x, y in EYE_GROW_SPARK]
+    out.append("@REP 2")
     out.append("WAIT")
+    out.append("@END")
     out += [f"COPY {10 * x + y:03d} GP" for x, y in SPARK_INNER]
     out.append("@REP 2")
     out.append("WAIT")
@@ -533,7 +535,7 @@ def main() -> None:
     out.append("@END")
     out += [f"COPY {100 + 10 * x + y} GP" for x, y in SPARK_INNER]
     out.append("")
-    out.append("COPY 41 X")
+    out.append("COPY 40 X")
     out.append("MARK BOOT_HOLD")
     out.append("WAIT")
     out.append("SUBI X 1 X")
@@ -653,7 +655,7 @@ def main() -> None:
         + ["@REP 3", "WAIT", "@END"]
         + [f"COPY {100 + 10 * x + y} GP" for x, y in EYE_GROW_WINK]
         + [f"COPY {100 + 10 * x + y} GP" for x, y in wink_pixels]
-        + ["@REP 11", "WAIT", "@END"]
+        + ["@REP 18", "WAIT", "@END"]
         + [f"COPY {10 * x + y:03d} GP" for x, y in wink_pixels]
     )
     au_source = au_source[:start_index] + au_tile + "\n" + au_source[end_index:]
