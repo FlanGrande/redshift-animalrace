@@ -27,6 +27,11 @@ INPUT_SLOTS = 19
 SOUND_ART_MAX = 18
 AUX_SLOTS = 2
 WINK_TILE = (50, 30)
+SPARK_TILE = (40, 30)
+EYE_GROW_WINK = ((1, 6), (2, 6), (3, 6), (0, 7), (4, 7), (5, 8), (5, 9))
+EYE_GROW_SPARK = ((9, 8), (9, 9))
+SPARK_INNER = ((7, 4), (6, 5), (7, 5), (8, 5), (7, 6))
+SPARK_OUTER = ((7, 3), (5, 5), (9, 5), (7, 7))
 
 def build_boot_sound() -> str:
     try:
@@ -435,6 +440,11 @@ def main() -> None:
     except StopIteration as error:
         raise SystemExit(f"wink tile {WINK_TILE} is not a dense splash tile") from error
     bt_tiles.remove(au_parent)
+    try:
+        bt_parent = next(tile for tile in bt_tiles if tile[:2] == SPARK_TILE)
+    except StopIteration as error:
+        raise SystemExit(f"spark tile {SPARK_TILE} is not a dense splash tile") from error
+    bt_tiles.remove(bt_parent)
     wink_pixels = [
         (x, y)
         for y in range(7, 10)
@@ -443,12 +453,16 @@ def main() -> None:
     ]
     if not wink_pixels:
         raise SystemExit(f"wink tile {WINK_TILE} contains no eye pixels")
+    if any(not au_parent[2][y * 10 + x] for x, y in EYE_GROW_WINK):
+        raise SystemExit(f"wink tile {WINK_TILE} has no clear area to grow the eye")
+    if any(not bt_parent[2][y * 10 + x] for x, y in EYE_GROW_SPARK):
+        raise SystemExit(f"spark tile {SPARK_TILE} has no clear area to grow the eye")
+    if any(not bt_parent[2][y * 10 + x] for x, y in SPARK_INNER + SPARK_OUTER):
+        raise SystemExit(f"spark tile {SPARK_TILE} has no clear area for the spark")
 
     bt_core = bt_tiles[:CORE_SLOTS]
     bt_input: list = []
     bt_sound = bt_tiles[CORE_SLOTS:]
-    bt_parent = min(bt_sound, key=lambda tile: len(sets(tile[2])))
-    bt_sound.remove(bt_parent)
     ui_input = ui_tiles[:INPUT_SLOTS]
     ui_remaining = ui_tiles[INPUT_SLOTS:]
     sound_free = SOUND_ART_MAX - len(bt_sound)
@@ -492,13 +506,34 @@ def main() -> None:
     out.append("LINK 801")
     out += spawn_lines(bt_sound, bt_patterns, state)
     out.append("; BT parent carries one tile without consuming another host slot.")
-    out.append("COPY 300 GP")
-    out += sets(bt_parent[2])
+    out += bt_routine(bt_parent[2])
     out.append(f"COPY {bt_parent[0]} GX")
     out.append(f"COPY {bt_parent[1]} GY")
     out += parent_wiggle_lines(bt_parent[1])
+    out.append("@REP 14")
+    out.append("WAIT")
+    out.append("@END")
+    out += [f"COPY {10 * x + y:03d} GP" for x, y in EYE_GROW_SPARK]
+    out.append("@REP 3")
+    out.append("WAIT")
+    out.append("@END")
+    out += [f"COPY {100 + 10 * x + y} GP" for x, y in EYE_GROW_SPARK]
+    out.append("WAIT")
+    out += [f"COPY {10 * x + y:03d} GP" for x, y in SPARK_INNER]
+    out.append("@REP 2")
+    out.append("WAIT")
+    out.append("@END")
+    out += [f"COPY {10 * x + y:03d} GP" for x, y in SPARK_OUTER]
+    out.append("@REP 2")
+    out.append("WAIT")
+    out.append("@END")
+    out += [f"COPY {100 + 10 * x + y} GP" for x, y in SPARK_OUTER]
+    out.append("@REP 2")
+    out.append("WAIT")
+    out.append("@END")
+    out += [f"COPY {100 + 10 * x + y} GP" for x, y in SPARK_INNER]
     out.append("")
-    out.append("COPY 65 X")
+    out.append("COPY 41 X")
     out.append("MARK BOOT_HOLD")
     out.append("WAIT")
     out.append("SUBI X 1 X")
@@ -614,8 +649,11 @@ def main() -> None:
             "WAIT",
             "@END",
         ]
+        + [f"COPY {10 * x + y:03d} GP" for x, y in EYE_GROW_WINK]
+        + ["@REP 3", "WAIT", "@END"]
+        + [f"COPY {100 + 10 * x + y} GP" for x, y in EYE_GROW_WINK]
         + [f"COPY {100 + 10 * x + y} GP" for x, y in wink_pixels]
-        + ["@REP 4", "WAIT", "@END"]
+        + ["@REP 11", "WAIT", "@END"]
         + [f"COPY {10 * x + y:03d} GP" for x, y in wink_pixels]
     )
     au_source = au_source[:start_index] + au_tile + "\n" + au_source[end_index:]

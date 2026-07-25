@@ -25,10 +25,11 @@ noise effects.
 
 Startup assembles an isometric Flan pudding mascot in place, swings its upper
 tiles wider than its lower tiles, reveals the `FlanGran.de` wordmark one piece
-at a time, and gives the mascot a wink. A four-channel boot jingle plays before
-game EXAs enter their input, UI, and audio hosts. `sprites/splash.txt` is the
-complete splash source image. During every build, `tools/gen_splash.py` slices
-it into EXA tiles and rewrites the generated sections in all four agent files.
+at a time, and gives the mascot a sparkling wink. A four-channel boot jingle
+plays before game EXAs enter their input, UI, and audio hosts.
+`sprites/splash.txt` is the complete splash source image. During every build,
+`tools/gen_splash.py` slices it into EXA tiles and rewrites the generated
+sections in all four agent files.
 
 `BANK` appears at the top-left. Each lane's odds appear under `ODDS` on the
 right. During wager selection, the wager digit appears just left of the chosen
